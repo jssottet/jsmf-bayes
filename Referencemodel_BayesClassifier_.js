@@ -78,7 +78,7 @@ function JSMFtypeof(val) {
 * @param givenClass: a JSMF Class
 * @return tabDoc: a collection of document for training the Naive Bayesian
 */
-//TODO: play on class definition alternance (i.e., put some of the attribute value when not mandatory; generate only equi-proportion of instances
+//TODO: play on class definition alternance (i.e., put some of the attribute value when not mandatory; generate only equi-proportion of instances)
 function buildDoc4Training(givenClass) {
 
 	var tabDoc = [];
@@ -109,11 +109,10 @@ function buildDoc4Training(givenClass) {
 		_.forEach(givenClass.getAllAttributes(), function(attributeObj,attributeName) {
 			if(!attributeObj.mandatory) {
 				//random generation -> should be equally distributed amongst non mandatory attributes?		
-				if(((Math.floor(Math.random() * 2) == 0))) { //50% chance to generate a non mandatory attribute
+				if(((Math.floor(Math.random() * 2) == 0))) { //50% chance to generate a non-mandatory attribute
 					curr_doc.add([attributeName +' : '+attributeObj.type.name]) 
 				}
 			} else {
-				
 				curr_doc.add([attributeName+' : '+attributeObj.type.name]) 
 			}
 		});
@@ -137,15 +136,14 @@ function buildDocTrainingReferences(givenClass) {
 	var tabDoc = [];
 	var curr_doc = undefined;
 
-	// giving a 5 excerpt for training purpose with ALL references.
+	// giving a 5 excerpt for training purpose with all the references of the class (included inherented).
 	for(i=0;i<5;i++) {
 
 		var itemName = 'item'+givenClass.__name+'_'+i; //building a document id with the name of the class and indice
 		var curr_doc = new Document(itemName,[]);
 
 		//Extend it to all inherited references
-		_.forEach(givenClass.getAllReferences(), function(referenceObj,referenceName) {		
-			//console.log(referenceObj.type.__name);	
+		_.forEach(givenClass.getAllReferences(), function(referenceObj,referenceName) {			
 			curr_doc.add([referenceName+' : '+referenceObj.type.__name]) 
 		});
 		tabDoc.push(curr_doc);
@@ -162,7 +160,7 @@ function buildDocTrainingReferences(givenClass) {
 **/
 function buildDataFromMetaModel(model) {
 	var data = new DataSet();
-//iterate over a model => build a function
+	//iterate over the metamodel 
 	_.map(model.classes, function(jsmfClass,className){
 		var documents = buildDoc4Training(jsmfClass[0]);
 		//Add the document to the given data set associated with the name of the class
@@ -174,7 +172,7 @@ function buildDataFromMetaModel(model) {
 
 function buildDataForReference(model) {
 	var data = new DataSet();
-//iterate over a model => build a function
+	//iterate over the metamodel
 	_.map(model.classes, function(jsmfClass,className){
 		var documents = buildDocTrainingReferences(jsmfClass[0]);
 		//Add the document to the given data set associated with the name of the class
@@ -215,11 +213,11 @@ function makeClassifiableReference(rawObject,classifiedMap)
 				var found = undefined;
 				for (var [keyM, valueM] of classifiedMap) {
 					for(i in valueM){
-						if(value===valueM[i]) {found=keyM; break;};
+						if(value===valueM[i].rawObject) {found=keyM; break;} 
 					}
 				}
+				//console.log(found, value);
 				var elem = key+' : '+found; //TODO: remove/try without the key, name of the reference
-				//console.log(elem);
 				if(found!==undefined) {
 					documentTab.push(elem);	
 				} else {
@@ -233,6 +231,10 @@ function makeClassifiableReference(rawObject,classifiedMap)
 
 /**
 * Entry point function: classify from a given metamodel
+* @metamodel JSMF metamodel: the metamodel patterns to find
+* @rawElements : an not ordered bag of JavaScript objects
+* @configuration : an object containing the parameters, like setting of probability threshold,
+* training set, etc.  (not implemented yet).
 */
 function classifyFromMetamodel(metamodel,rawElements,configuration) {
 
@@ -254,39 +256,44 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
 
     var bagRaw = rawElements;
 
-  	//console.log(bagRaw);
+	//Contains the map associating raw element with its two kind of probabilities with a metamodel element
+	// Map should have the following signature:
+	// map(ClassName, [{ProbObject}])
+	// ProbObject : {'rawObject': , 'ProbaAtt':[classifier.probabilities];'ProbaRef':[classifier.probabilities]}
+    var map = new Map();
 
-    var map= new Map();
-
-    //init map with each classifiers + unclassified.
-    _.each(classifier.probabilities, function(x,y){
-                                    map.set(y,[]);
+	
+    //initialise map with each classifiers + unclassified.
+    _.each(classifier.probabilities, 
+				function(x,y){
+	                map.set(y,[]);
             });
 
+	//intialise map for element which are not recognised
     map.set('unclassified',[]);
 
-    //First classification without references taken into account
+    //First pre-classification without references: just attributes signatures
     for(i in bagRaw) {
         var currentRaw = bagRaw[i];
         var doc = makeClassifiable(bagRaw[i]);
         var currentclassification = classifier.classify(doc);
-        console.log('',currentRaw,' : ' ,currentclassification,'\n');
+
         className = currentclassification.category;
         if(currentclassification.probability<1 ||
            currentclassification.probabilities[0].probability<0.09) { //TODO: check value for Threshold for "too loose" criteria for classifying.
-            className = 'unclassified';
+           className = 'unclassified';
         } else {
             className = currentclassification.category;
         }
-		 //className = currentclassification.category;	
         var tab = map.get(className);
-
-            tab.push(currentRaw);	
-            map.set(className,tab);
+		
+		ProbaTab = currentclassification.probabilities;
+		var Obj= {'rawObject': currentRaw, 'ProbaAttribute':currentclassification.probabilities};
+        tab.push(Obj);	 //currentRaw
+        map.set(className,tab);
     }
 
-    //Second classification (or until we reach a point...)
-    //Find a end!!!! => while unclassified && needs to change
+    //Second classification (until reaching a fix point)
     var refData = buildDataForReference(metamodel);
 
     var classifierRef = new Classifier(options);
@@ -294,34 +301,41 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
     //Train the classifier on (references)data
     classifierRef.train(refData);
 
-    console.log(JSON.stringify(classifierRef.probabilities, null, 4));
-    var update = true; 
-    console.log('Before Referencing',map);
-    while(update) { //update => warning
+   // console.log(JSON.stringify(classifierRef.probabilities, null, 4));
+    console.log('Before Reference classification: ', map);
+	var update = true; 
+
+
+    while(update) { 
         update=false;
         for (var [keyMap,valueMap] of map) {
 
             for(i in valueMap) {
-                var rawObject = valueMap[i];
-                var doc = makeClassifiableReference(rawObject,map);
-				//issue?
-                currentclassification=classifierRef.classify(doc);
-				
-                currentClass = currentclassification.category;
-            
-                //check the attribute signature (i.e., remove false positive)
-                if(currentClass!=keyMap) {
-					console.log('!! ',rawObject,' level: ',currentclassification);
-                    update = true;
-                    console.log('Classification needs to be updated from ', keyMap , ' to ', currentClass);
-                    //Make the change in the map (TODO: keep a trace of the original!).
-                    console.log('Before ',map);
-                    //remove the element of the map from its older position
-					//Check if the type is correct
-                    _.remove(map.get(keyMap), function(ob){ return ob==rawObject}); 
+                var rawObject = valueMap[i].rawObject;
+				var probaAtt = valueMap[i].ProbaAttribute;
 
-                    map.get(currentClass).push(rawObject);
-                    console.log('After ',map);
+                var doc = makeClassifiableReference(rawObject,map);
+	
+                currentclassification = classifierRef.classify(doc);
+	
+				//Take the first (most probable) classification category.		
+                currentClass = currentclassification.category;
+
+                //TODO: also check  here the attribute signature (i.e., remove false-positive)
+                if(currentClass!=keyMap) {
+                    update = true;
+                    console.log('Classification needs to be updated from ', keyMap , 
+								' to ', currentClass, 'for', rawObject);
+
+              		//console.log('Before ',map);
+
+                    //remove the element of the map from its older position
+                    _.remove(map.get(keyMap), function(ob){ return ob.rawObject==rawObject}); 
+
+					var Obj= {'rawObject': rawObject, 'ProbaAttribute':probaAtt,
+								'ProbaRef': currentclassification.probabilities};
+                    map.get(currentClass).push(Obj); //rawObject
+                    console.log('After ', map);
                 }
             }
         }
@@ -331,5 +345,14 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
     return map;
     
 } //end function
+
+
+function correctModelAgainstMetamodel(metamodel,mapProba) {
+	//build a first JSMF model from the mapped elements
+
+	//correct the JSMF model
+
+
+}
 
 module.exports = { classifyFromMetamodel};

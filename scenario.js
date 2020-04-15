@@ -1,4 +1,4 @@
-var classifier = require('./S_Classifier_ReferenceLib');
+var classifier = require('./Referencemodel_BayesClassifier_');
 var JSMF = require('jsmf-core'); var Model = JSMF.Model; var Class = JSMF.Class;
 var _ = require('lodash');
 
@@ -410,7 +410,7 @@ var bagRaw = [a,b,c,d];
 classifier.classifyFromMetamodel(m,bagRaw);
 */
 
-
+//Run the scenario(s) of your choice by uncommenting.
 //scenario1();
 //scenario2();
 //scenario3a();
