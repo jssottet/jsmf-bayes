@@ -69,6 +69,7 @@ function scenario2() {
 
 }
 
+//Warning: not fully defined
 function scenario3() {
 
 	var mmsc1 = new Model();
@@ -224,6 +225,7 @@ function scenario3bprime() {
 
 function scenario3c() {
 
+
 	var mmsc1 = new Model();
 
 	var C1 = Class.newInstance('C1');
@@ -241,6 +243,7 @@ function scenario3c() {
 	mmsc1.add([C1,C2,C4]);
 	
 	var c4 = {name:'ac4'};
+	var c4prime = {name:'ac4prime'};
 	var c2 = {name:'ac2'};
 	//var c2End = {name:'ac2'}
 
@@ -303,7 +306,6 @@ function scenario5() {
 	var C3 = Class.newInstance('C3');
 	C3.setAttribute('name', String);
 
-
 	
 	C1.setReference('toC2',C2,-1);
 	C2.setReference('toC3',C3,-1);
@@ -330,6 +332,100 @@ function scenario5() {
 
 }
 
+
+function scenarioAPKReverse() {
+	var mmAPK = new Model();
+	
+	var Apk = Class.newInstance('Apk');
+	Apk.setAttribute('name', String);
+	Apk.setAttribute('version', Number);
+	
+	//var Permission = Class.newInstance();
+	//Permission.setAttribute();
+
+	var Component = Class.newInstance('Component');
+	Component.setAttribute('name', String);
+	Component.setAttribute('kind', Number);
+	Component.setAttribute('export', Boolean);
+
+	var Instruction = Class.newInstance('Instruction');
+	Instruction.setAttribute('statement', String);
+	Instruction.setAttribute('class_name', String);
+	Instruction.setAttribute('method', String);
+	Instruction.setAttribute('id', Number);
+
+	Apk.setReference('components',Component,-1);
+	Component.setReference('instructions',Instruction,-1);
+
+	mmAPK.add([Apk,Component,Instruction]);
+	//The example excerpts
+	var apkroot = {
+    	"name": "a2dp.Vol",
+    	"version": 107,
+    	"permissions": [],
+    	"used_permissions": [
+    	    "android.permission.WRITE_EXTERNAL_STORAGE",
+    	    "android.permission.ACCESS_WIFI_STATE",
+    	    "com.google.android.providers.talk.permission.READ_ONLY",
+    	    "android.permission.RECEIVE_SMS",
+    	    "android.permission.ACCESS_COARSE_LOCATION",
+    	    "android.permission.GET_ACCOUNTS",
+    	    "android.permission.READ_CONTACTS",
+    	    "android.permission.RESTART_PACKAGES",
+    	    "android.permission.KILL_BACKGROUND_PROCESSES",
+    	    "android.permission.MODIFY_AUDIO_SETTINGS",
+    	    "android.permission.READ_PHONE_STATE",
+    	    "android.permission.RECEIVE_BOOT_COMPLETED",
+    	    "android.permission.BLUETOOTH",
+    	    "android.permission.CHANGE_WIFI_STATE",
+    	    "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+    	    "android.permission.ACCESS_FINE_LOCATION",
+    	    "android.permission.BROADCAST_STICKY",
+    	    "com.android.launcher.permission.READ_SETTINGS",
+    	    "android.permission.BLUETOOTH_ADMIN"
+    	]
+	}
+	
+	var componenta2dpVol = {
+		 "name": "a2dp.Vol.service",
+         "kind": 1,
+         "exported": false,
+         "permission": null,
+         "missing": null,
+         "extras": [],
+         "alias_target": null,
+         "grant_uri_permissions": null,
+         "read_permission": null,
+         "write_permission": null,
+         "authorities": [],
+         "intent_filters": []
+	}
+	
+	var instructionr21 = {
+         "statement": "virtualinvoke r21.<a2dp.Vol.MyApplication: void sendBroadcast(android.content.Intent)>(r3)",
+         "class_name": "a2dp.Vol.service",
+         "method": "<a2dp.Vol.service: void onDestroy()>",
+         "id": 43
+    };
+
+	var instructionr91 = {
+          "statement": "virtualinvoke r91.<a2dp.Vol.MyApplication: void sendBroadcast(android.content.Intent)>(r7)",
+          "class_name": "a2dp.Vol.service",
+          "method": "<a2dp.Vol.service: void onCreate()>",
+          "id": 172
+     };
+
+	apkroot.components=(componenta2dpVol);
+	componenta2dpVol.exitpoints=[instructionr21,instructionr91];
+	
+
+	//build the data example from objects
+	var bagRaw = [apkroot,componenta2dpVol,instructionr21,instructionr91];
+
+	//launch the classifier
+	var finalclassificationMap = classifier.classifyFromMetamodel(mmAPK,bagRaw);
+	console.log(finalclassificationMap);
+}
 /*
 //Reference metamodel
 var B = Class.newInstance('B');
@@ -414,8 +510,9 @@ classifier.classifyFromMetamodel(m,bagRaw);
 //scenario1();
 //scenario2();
 //scenario3a();
-scenario3b();
+//scenario3b();
 //scenario3bprime();
 //scenario3c();
 //scenario4();
 //scenario5();
+scenarioAPKReverse();

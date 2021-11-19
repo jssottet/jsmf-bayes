@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright ©2016-2019 Luxembourg Institute of Science and Technology All Rights Reserved
+ * Copyright ©2016-2021 Luxembourg Institute of Science and Technology All Rights Reserved
  * 
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,6 +32,7 @@
 var JSMF = require('jsmf-core'); var Model = JSMF.Model; var Class = JSMF.Class;
 var _ = require('lodash');
 
+//Warning: A unique Class name should be provided: JSMF.Class.newInstance('name') check it first ...
 var dclassify = require('dclassify');
 //var natural = require('natural');
 
@@ -280,7 +281,7 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
 
         className = currentclassification.category;
         if(currentclassification.probability<1 ||
-           currentclassification.probabilities[0].probability<0.09) { //TODO: check value for Threshold for "too loose" criteria for classifying.
+           currentclassification.probabilities[0].probability<0.09) { //adjustement: check value for Threshold for "too loose" criteria for classifying.
            className = 'unclassified';
         } else {
             className = currentclassification.category;
@@ -305,7 +306,7 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
     console.log('Before Reference classification: ', map);
 	var update = true; 
 
-
+	//TODO check cardinality
     while(update) { 
         update=false;
         for (var [keyMap,valueMap] of map) {
@@ -320,25 +321,32 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
 	
 				//Take the first (most probable) classification category.		
                 currentClass = currentclassification.category;
+				console.log(currentClass, ' VS \n',probaAtt);
 
-                //TODO: also check  here the attribute signature (i.e., remove false-positive)
-                if(currentClass!=keyMap) {
-                    update = true;
-                    console.log('Classification needs to be updated from ', keyMap , 
+                //Confront with the attribute signature (i.e., remove false-positive)
+				var probaAttofcurrentClassifier= _.find(probaAtt,['category', currentClass]).probability;
+				if(probaAttofcurrentClassifier < 0.09) { //Threshold to be precised
+					console.log('too low probability')
+				} else {
+                	if(currentClass!=keyMap) {
+                    	update = true;
+                    	console.log('Classification needs to be updated from ', keyMap , 
 								' to ', currentClass, 'for', rawObject);
 
-              		//console.log('Before ',map);
+              			//console.log('Before ',map);
 
-                    //remove the element of the map from its older position
-                    _.remove(map.get(keyMap), function(ob){ return ob.rawObject==rawObject}); 
+                    	//remove the element of the map from its older position
+                    	_.remove(map.get(keyMap), function(ob){ return ob.rawObject==rawObject}); 
 
-					var Obj= {'rawObject': rawObject, 'ProbaAttribute':probaAtt,
+						var Obj= {'rawObject': rawObject, 'ProbaAttribute':probaAtt,
 								'ProbaRef': currentclassification.probabilities};
-                    map.get(currentClass).push(Obj); //rawObject
-                    console.log('After ', map);
-                }
-            }
-        }
+                    	map.get(currentClass).push(Obj); //rawObject
+                    	console.log('After ', map);
+						//console.log(currentclassification.probabilities);
+                	}
+				} // end else if(probaAttofcurrentClassifier < 0.09)
+            } // end for i in valueMap
+        } // end for [keyMap,valueMap] of map
 
     } //end while update
 
