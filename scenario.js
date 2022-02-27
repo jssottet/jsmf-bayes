@@ -1,6 +1,6 @@
 var classifier = require('./Referencemodel_BayesClassifier_');
 var JSMF = require('jsmf-core'); var Model = JSMF.Model; var Class = JSMF.Class;
-var _ = require('lodash');
+var _ = require('lodash'), util = require('util');
 
 // Create a new JSMF (meta)model
 var m = new Model();
@@ -358,7 +358,8 @@ function scenarioAPKReverse() {
 	Component.setReference('instructions',Instruction,-1);
 
 	mmAPK.add([Apk,Component,Instruction]);
-	//The example excerpts
+
+	//The example excerpts, is a transcription 'object by object' of what is produced by protobuf of a reverse-engineered APK.
 	var apkroot = {
     	"name": "a2dp.Vol",
     	"version": 107,
@@ -386,21 +387,104 @@ function scenarioAPKReverse() {
     	]
 	}
 	
-	var componenta2dpVol = {
-		 "name": "a2dp.Vol.service",
+	var componenta2dpService = {"name": "a2dp.Vol.service",
          "kind": 1,
          "exported": false,
          "permission": null,
          "missing": null,
-         "extras": [],
          "alias_target": null,
          "grant_uri_permissions": null,
          "read_permission": null,
          "write_permission": null,
          "authorities": [],
-         "intent_filters": []
 	}
 	
+	 var componenta2dpAppChooser = {"name": 'a2dp.Vol.AppChooser',
+      "kind": 0,
+      "exported": false,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": [],
+    }
+
+	var componenta2dpProviderList ={"name": 'a2dp.Vol.ProviderList',
+      "kind": 0,
+      "exported": false,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": []
+    }
+
+	var componenta2dpALauncher= {"name": 'a2dp.Vol.ALauncher',
+      "kind": 1,
+      "exported": false,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": []
+    }
+
+
+	var componenta2dpEditDevice= {"name": 'a2dp.Vol.EditDevice',
+      "kind": 0,
+      "exported": false,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": []
+    }
+
+  var componenta2dpStarter= {"name": 'a2dp.Vol.Starter',
+      "kind": 2,
+      "exported": true,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": []
+    }
+
+
+var componenta2dpCustomIntentMaker= {"name": 'a2dp.Vol.CustomIntentMaker',
+      "kind": 0,
+      "exported": false,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": []
+    }
+
+var componenta2dpPreferences = { "name": 'a2dp.Vol.Preferences',
+      "kind": 0,
+      "exported": false,
+      "permission": null,
+      "missing": null,
+      "alias_target": null,
+      "grant_uri_permissions": null,
+      "read_permission": null,
+      "write_permission": null,
+      "authorities": []
+}
+
 	var instructionr21 = {
          "statement": "virtualinvoke r21.<a2dp.Vol.MyApplication: void sendBroadcast(android.content.Intent)>(r3)",
          "class_name": "a2dp.Vol.service",
@@ -415,96 +499,37 @@ function scenarioAPKReverse() {
           "id": 172
      };
 
-	apkroot.components=(componenta2dpVol);
-	componenta2dpVol.exitpoints=[instructionr21,instructionr91];
+	var instructionr13 = {
+         "statement": "virtualinvoke r13.<a2dp.Vol.MyApplication: void sendBroadcast(android.content.Intent)>(r3)",
+         "class_name": "a2dp.Vol.Preferences",
+         "method": "<a2dp.Vol.Preferences: void onDestroy()>",
+         "id": 43
+    };
 	
+	var instructionr0 = {
+         "statement": "virtualinvoke r0.<a2dp.Vol.Preferences: android.content.ComponentName startService(android.content.Intent)>(r8)",
+         "class_name": "a2dp.Vol.Preferences",
+         "method": "<a2dp.Vol.service: void onDestroy()>",
+         "id": 43
+    };
+
+	apkroot.components=(componenta2dpService,componenta2dpAppChooser,componenta2dpProviderList,componenta2dpALauncher,
+componenta2dpEditDevice,componenta2dpStarter,componenta2dpCustomIntentMaker,componenta2dpPreferences);
+	componenta2dpService.exitpoints=[instructionr21,instructionr91];
+	componenta2dpPreferences.exitpoints=[instructionr13,instructionr0];
 
 	//build the data example from objects
-	var bagRaw = [apkroot,componenta2dpVol,instructionr21,instructionr91];
+	var bagRaw = [apkroot,componenta2dpService,instructionr21,instructionr91,instructionr13,instructionr0,componenta2dpAppChooser,componenta2dpProviderList,componenta2dpALauncher,
+componenta2dpEditDevice,componenta2dpStarter,componenta2dpCustomIntentMaker,componenta2dpPreferences
+	
+	];
 
 	//launch the classifier
 	var finalclassificationMap = classifier.classifyFromMetamodel(mmAPK,bagRaw);
+	//	console.log('final',util.inspect(finalclassificationMap,showHidden=false, depth=3, colorize=true));
 	console.log(finalclassificationMap);
 }
-/*
-//Reference metamodel
-var B = Class.newInstance('B');
-B.setAttribute('type', Number);
-B.setAttribute('strength', Number);
 
-var A = Class.newInstance('A');
-A.setAttribute('name', String);
-A.setAttribute('value', Number);
-A.setReference('toB',B,-1);
-
-m.add([A,B]);
-
-
-var C1 = Class.newInstance('C1');
-C1.setAttribute('name',String);
-C1.setAttribute('value',Number);
-
-var C2 = Class.newInstance('C2');
-C2.setAttribute('name',String);
-C2.setAttribute('category',Number);
-
-//m.add([C1,C2]);
-
-
-var One = Class.newInstance('One');
-One.setAttribute('type', String);
-
-var Two = Class.newInstance('Two');
-Two.setAttribute('name', String);
-
-var Three = Class.newInstance('Three');
-Three.setAttribute('name',String);
-
-One.setReference('toTwo',Two,-1);
-Two.setReference('toThree',Three,-1);
-
-
-//m.add([One,Two,Three]);
-
-//V1->V3 same signature; 
-var V1 = Class.newInstance('V1');
-V1.setAttribute('name',String);
-
-var V2 = Class.newInstance('V2');
-V1.setAttribute('name',String);
-
-var V3 = Class.newInstance('V3');
-V1.setAttribute('name',String);
-
-
-V1.setReference('toV2',V2,-1);
-V2.setReference('toV3',V3,-1);
-
-//m.add([V1,V2,V3]);
-
-//Example to be classified
-var b = {'type':14,'strength':1};
-
-var c = {'type':42,'strength':2};
-
-var a = {'name':'toto','value':14,'toB':b};
-
-var d = {'toB':[b,c]}
-
-var o3 = {'name':'wheel'}
-var o2 = {'name':'engine','toThree':o3}
-var o1 = {'type':'hatchback','toTwo':o2};
-
-
-var va = {'name':'Three'};
-var vb = {'name': 'Two', 'toV3': va};
-var vc = {'name':'One', 'toV2':vb};
-var vx = {'name':'OPrime','toV2':vb};
-
-var bagRaw = [a,b,c,d];
-
-classifier.classifyFromMetamodel(m,bagRaw);
-*/
 
 //Run the scenario(s) of your choice by uncommenting.
 //scenario1();

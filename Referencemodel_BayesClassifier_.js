@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright ©2016-2021 Luxembourg Institute of Science and Technology All Rights Reserved
+ * Copyright ©2016-2022 Luxembourg Institute of Science and Technology All Rights Reserved
  * 
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -58,7 +58,8 @@ function JSMFtypeof(val) {
                 result = 'isBoolean'
                 break;
             case 'object' :
-                //if is JSMFObject
+                /* if is JSMFObject; TODO: provide a more complete set of 
+				basic object or a different signature for reference */
                 if(val instanceof Date) {
                  result = 'isDate'
                 } else {
@@ -222,7 +223,7 @@ function makeClassifiableReference(rawObject,classifiedMap)
 				if(found!==undefined) {
 					documentTab.push(elem);	
 				} else {
-					console.log('Target of the relation no in the initial data');
+					console.log('Target of the relation not present in the input data');
 				}
 			}
 		});
@@ -234,7 +235,7 @@ function makeClassifiableReference(rawObject,classifiedMap)
 * Entry point function: classify from a given metamodel
 * @metamodel JSMF metamodel: the metamodel patterns to find
 * @rawElements : an not ordered bag of JavaScript objects
-* @configuration : an object containing the parameters, like setting of probability threshold,
+* @configuration : an object containing the hyperparameters, like setting of probability threshold,
 * training set, etc.  (not implemented yet).
 */
 function classifyFromMetamodel(metamodel,rawElements,configuration) {
@@ -280,8 +281,10 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
         var currentclassification = classifier.classify(doc);
 
         className = currentclassification.category;
+
+		//hyper-parameter adjustement: check value for threshold for "too loose" criteria for classifying.
         if(currentclassification.probability<1 ||
-           currentclassification.probabilities[0].probability<0.09) { //adjustement: check value for Threshold for "too loose" criteria for classifying.
+           currentclassification.probabilities[0].probability<0.09) { 
            className = 'unclassified';
         } else {
             className = currentclassification.category;
@@ -294,7 +297,6 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
         map.set(className,tab);
     }
 
-    //Second classification (until reaching a fix point)
     var refData = buildDataForReference(metamodel);
 
     var classifierRef = new Classifier(options);
@@ -306,7 +308,9 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
     console.log('Before Reference classification: ', map);
 	var update = true; 
 
-	//TODO check cardinality
+	var permuted = [];
+
+	//Second classification (until reaching a fix point)
     while(update) { 
         update=false;
         for (var [keyMap,valueMap] of map) {
@@ -314,53 +318,180 @@ function classifyFromMetamodel(metamodel,rawElements,configuration) {
             for(i in valueMap) {
                 var rawObject = valueMap[i].rawObject;
 				var probaAtt = valueMap[i].ProbaAttribute;
-
+				//var probaRef = valueMap[i].ProbaRef;
+				
                 var doc = makeClassifiableReference(rawObject,map);
 	
                 currentclassification = classifierRef.classify(doc);
-	
+								
 				//Take the first (most probable) classification category.		
                 currentClass = currentclassification.category;
-				console.log(currentClass, ' VS \n',probaAtt);
-
-                //Confront with the attribute signature (i.e., remove false-positive)
-				var probaAttofcurrentClassifier= _.find(probaAtt,['category', currentClass]).probability;
-				if(probaAttofcurrentClassifier < 0.09) { //Threshold to be precised
-					console.log('too low probability')
-				} else {
-                	if(currentClass!=keyMap) {
-                    	update = true;
-                    	console.log('Classification needs to be updated from ', keyMap , 
-								' to ', currentClass, 'for', rawObject);
-
-              			//console.log('Before ',map);
-
-                    	//remove the element of the map from its older position
-                    	_.remove(map.get(keyMap), function(ob){ return ob.rawObject==rawObject}); 
-
-						var Obj= {'rawObject': rawObject, 'ProbaAttribute':probaAtt,
+				
+				//Correction against the metamodel currently propose one alternative (i.e., currentclassification.secondCategory)
+				var res = correctModelAgainstMetamodel(metamodel,bagRaw,rawObject, map, currentclassification);
+				update = res.update;
+				if(update) {
+					console.log(res);
+					key = res.oldClassifier;
+					_.remove(map.get(key), function(ob){ return ob.rawObject==res.rawObject}); 
+					var Obj= {'rawObject': res.rawObject, 'ProbaAttribute':probaAtt,
 								'ProbaRef': currentclassification.probabilities};
-                    	map.get(currentClass).push(Obj); //rawObject
-                    	console.log('After ', map);
-						//console.log(currentclassification.probabilities);
+					map.get(res.newClassifier).push(Obj);
+					permuted.push(res.rawObject);
+					console.log('After ', map);
+				}
+				
+                //Check with the attribute signature (i.e., remove false-positive), also todo, check multiplicity
+				var probaAttofcurrentClassifier= _.find(probaAtt,['category', currentClass]).probability;
+				if(probaAttofcurrentClassifier < 0.09) { //hyperparameter, threshold to be set
+					console.log('too low attribute probability')
+				} else {
+					//if Object has been already permuted by metamodel
+                	if(currentClass!=keyMap) {
+						if(permuted.some(object => object === rawObject)){
+   							 console.log("Object found inside the array.");
+						} else {
+                    		update = true;
+                    		console.log('Classification needs to be updated from ', keyMap , 
+								' to ', currentClass, 'for', rawObject);
+							console.log('With ', currentclassification.probabilities);
+
+                    		//remove the element of the map from its older position
+                    		_.remove(map.get(keyMap), function(ob){ return ob.rawObject==rawObject}); 
+
+							var Obj= {'rawObject': rawObject, 'ProbaAttribute':probaAtt,
+								'ProbaRef': currentclassification.probabilities};
+                    		map.get(currentClass).push(Obj); //rawObject
+                    		console.log('After ', map);
+						}
                 	}
 				} // end else if(probaAttofcurrentClassifier < 0.09)
             } // end for i in valueMap
         } // end for [keyMap,valueMap] of map
-
+		
     } //end while update
+
+	//InstianteObjectAccordingToMetamodel(metamodel,map);
 
     return map;
     
 } //end function
 
 
-function correctModelAgainstMetamodel(metamodel,mapProba) {
+
+/*
+1)
+2) get classification of predecessors and compare to the classification
+3) if correction is need, get the classification proba and return the new and old classifier for updating */
+function correctModelAgainstMetamodel(metamodel,bagRaw,object,map,currentclassification) {
+    
+  var result = {'update':false};
+  var objectClass =  getClassFromObjectInClassificationMap(metamodel,object,map);
+	// object has a classifier that belongs to the metamodel <=> is it not classified as undefined
+  if(objectClass!== undefined) {
+	//1)compute predecessors of object
+	//bagraw,object
+	for(i in bagRaw) {
+		var currentRaw = bagRaw[i];
+		_.forEach(currentRaw,function(value,key){
+			var type = JSMFtypeof(value);
+			if(type=='reference') {
+				if(value===object){
+					//check if preceding value has a classification
+					var predClass =	getClassFromObjectInClassificationMap(metamodel,currentRaw,map);
+					console.log('preceding class', predClass, 'with object', objectClass);
+					if(predClass!==undefined) {
+						// Check if predecessor classifier is a real predecessor in metamodel 
+						var referencedClasses = _.values(predClass.getAllReferences());
+						var AlternativeClassifierName = currentclassification.secondCategory;
+						var AlternativeClass = _.find(metamodel.classes,function(fclass){return fclass[0].__name == AlternativeClassifierName})[0];
+						var isReferenced = _.find(referencedClasses, function(o){
+															return o.type==objectClass});
+						var isAlternativeReferenced = _.find(referencedClasses, function(o){
+															return o.type==AlternativeClass});
+						
+							if(isReferenced==undefined){
+								console.log("Classification that contradicts the metamodel \n",
+											'With predecessor object: ',currentRaw,'of type',predClass.__name,
+											'with current object',object, 'of type',objectClass.__name);
+								if(isAlternativeReferenced!==undefined) {
+									result = {'update':true,
+											'rawObject':object,
+											'newClassifier':AlternativeClassifierName,
+											'oldClassifier':objectClass.__name};
+								}
+							}	
+					}
+				} //end if value == object
+			} //end if type == reference
+		}); // end _.forEach
+	 } //end for
+  } //endif undefined 
+	else {
+		console.log(object,'is not classified');
+  }
+
+	return result;
+}
+
+
+function buildJSMFModel(metamodel,mapProba) {
 	//build a first JSMF model from the mapped elements
+	for (let [classifier, object] of mapProba ) {
+		var currentclasses = _.find(metamodel.classes, function(fclass){
+							return fclass[0].__name == classifier;
+						  });
+		///Object is not classified has undefined, pertaining to the input draft metamodel.
+		if(currentclasses != undefined) {
+			if(object[0]!=undefined) { 
+			currentObject = object[0].rawObject;
+			
+			var objectToInstantiate = {};
+			_.forEach(currentObject,function(value,key){
+				var type=JSMFtypeof(value);
+				if(type!=='reference') {
+					objectToInstantiate[key]=value;
+					console.log(objectToInstantiate);
+				} else {
+					console.log('');
+				}
+			}); //end forEach
+			var jsmfObject = currentclasses[0].newInstance(objectToInstantiate);
+			console.log(jsmfObject);
+			} else {
+			console.log('Class', currentclasses[0].__name, 'has instance no found in input data');
+			} //end else
+		} //end if currentclasses is found 
+	} // end for mapProba
+	//TODO: references instanciation... from transient map jsmf instance - object
+}
 
-	//correct the JSMF model
-
-
+//Utility function that provide the JSMF Class for a given object according the current classification map
+function getClassFromObjectInClassificationMap(metamodel,object,map) {
+	var result = undefined;
+	var classifierFound = undefined;
+	for(let [classifierName, obj] of map) {
+		var classifiedObject = _.find(obj, function(o) {
+						if(obj !==undefined) {
+							return o.rawObject === object
+						}
+					});
+	
+		if(classifiedObject!=undefined) { 
+			//console.log(classifiedObject.ProbaRef);
+			classifierFound=classifierName;
+			break;
+	  	}
+	}
+	result = _.find(metamodel.classes, 
+						function(fclass){ 
+							if(classifierFound==undefined) { 
+								return undefined; 
+							} else {
+								return fclass[0].__name == classifierFound;
+							}
+					   });
+	if(result==undefined) { return result; } else { return result[0];}
 }
 
 module.exports = { classifyFromMetamodel};

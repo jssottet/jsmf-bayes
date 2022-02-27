@@ -26,3 +26,7 @@ Such implementation working with probability will encounter an issue when dealin
 Obviously, undecidable cases are also giving random results. For instance, for this class pattern A-> B <- C (A has a reference to B
 and C a reference to B; A, B, C are only classifiable using relationships); The classification can state that any object related to B
 can be either A or C. It will give, as answer the first most probable classifier;
+
+
+### Additional notes
+The current implementation is very verbose (many outputs on the console) for understanding and explanation purpose. 
